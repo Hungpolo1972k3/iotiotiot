@@ -74,6 +74,9 @@ io.on('connection', (socket) => {
         console.log('User disconnected');
     });
 });
+app.get('*', (req, res) => {
+    res.sendFile(__dirname + '/index.html');
+});
 
 // Khởi động server
 const PORT = process.env.PORT || 5000;
