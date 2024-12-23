@@ -16,6 +16,9 @@ const upload = multer({ storage: storage });
 // Cấu hình thư mục public để phục vụ các file tĩnh (HTML, CSS, JS)
 app.use(express.static('public'));
 
+// Tọa độ mặc định nếu không có tọa độ hợp lệ
+const defaultCoordinates = [10, 10, 200, 200]; // [x1, y1, x2, y2]
+
 // Xử lý yêu cầu tải lên ảnh và thông tin tọa độ
 app.post('/upload', upload.single('image'), (req, res) => {
     if (!req.file) {
@@ -23,13 +26,15 @@ app.post('/upload', upload.single('image'), (req, res) => {
     }
     
     const imageBuffer = req.file.buffer;
-    const { coords } = req.body; // Tọa độ 4 điểm gửi từ client
-    
-    if (!coords || coords.length !== 8) {
-        return res.status(400).send('Invalid coordinates');
-    }
+    let coordinates = req.body.coords;
 
-    const coordinates = JSON.parse(coords); // Chuyển tọa độ thành mảng số
+    // Kiểm tra và xử lý tọa độ, nếu không hợp lệ thì dùng tọa độ mặc định
+    if (!coordinates || coordinates.length !== 8) {
+        console.log('Invalid or missing coordinates, using default coordinates');
+        coordinates = defaultCoordinates; // Sử dụng tọa độ mặc định
+    } else {
+        coordinates = JSON.parse(coordinates); // Chuyển tọa độ thành mảng số
+    }
 
     // Xử lý ảnh và vẽ border hình chữ nhật
     sharp(imageBuffer)
@@ -46,14 +51,17 @@ app.post('/upload', upload.single('image'), (req, res) => {
 });
 
 // Hàm tạo ảnh hình chữ nhật từ tọa độ
-function createRectangle(coords) {
-    const { x1, y1, x2, y2 } = coords;
+const { createCanvas } = require('canvas'); // Thêm vào đầu file
 
-    const canvas = Buffer.alloc(1000 * 1000); // Tạo canvas tạm
+// Hàm tạo ảnh hình chữ nhật từ tọa độ
+function createRectangle(coords) {
+    const [x1, y1, x2, y2] = coords;
+
+    const canvas = createCanvas(1000, 1000); // Tạo canvas mới
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Màu border đỏ trong suốt
     ctx.fillRect(x1, y1, x2 - x1, y2 - y1); // Vẽ hình chữ nhật
-    return canvas;
+    return canvas.toBuffer(); // Trả về buffer của canvas
 }
 
 // Cấu hình Socket.io
