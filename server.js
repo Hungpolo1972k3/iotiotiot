@@ -3,6 +3,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const http = require('http');
 const socketIo = require('socket.io');
+const cors = require('cors');
 
 // Tạo ứng dụng Express
 const app = express();
@@ -13,11 +14,13 @@ const io = socketIo(server);
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+app.use(cors());
+
 // Cấu hình thư mục public để phục vụ các file tĩnh (HTML, CSS, JS)
 app.use(express.static('public'));
 
 // Tọa độ mặc định nếu không có tọa độ hợp lệ
-const defaultCoordinates = [10, 10, 200, 200]; // [x1, y1, x2, y2]
+const defaultCoordinates = [100, 100, 200, 200]; // [x1, y1, x2, y2]
 
 // Xử lý yêu cầu tải lên ảnh và thông tin tọa độ
 app.post('/upload', upload.single('image'), (req, res) => {
@@ -38,25 +41,33 @@ app.post('/upload', upload.single('image'), (req, res) => {
 
     // Xử lý ảnh và vẽ border hình chữ nhật
     sharp(imageBuffer)
-        .resize(1000, 1000) // Resize ảnh nếu cần
-        .composite([{
-            input: Buffer.from(`
-                <svg width="1000" height="1000">
-                    <rect x="${coordinates[0]}" y="${coordinates[1]}" width="${coordinates[2] - coordinates[0]}" height="${coordinates[3] - coordinates[1]}" fill="rgba(255, 0, 0, 0.5)" />
-                </svg>
-            `),
-            top: 0,
-            left: 0
-        }]) // Chèn hình chữ nhật lên ảnh
-        .toBuffer()
-        .then(data => {
-            res.type('image/png');
-            res.send(data); // Gửi ảnh đã chỉnh sửa về client
-        })
-        .catch(err => {
-            console.error(err);
-            res.status(500).send('Error processing image');
-        });
+    .resize(1000, 1000) // Resize ảnh nếu cần
+    .composite([{
+        input: Buffer.from(`
+            <svg width="1000" height="1000">
+                <rect 
+                    x="${coordinates[0]}" 
+                    y="${coordinates[1]}" 
+                    width="${coordinates[2] - coordinates[0]}" 
+                    height="${coordinates[3] - coordinates[1]}" 
+                    fill="none"  // Không có màu nền
+                    stroke="red"  // Viền đỏ
+                    stroke-width="5"  // Độ dày viền (tùy chỉnh)
+                />
+            </svg>
+        `),
+        top: 0,
+        left: 0
+    }]) 
+    .toBuffer()
+    .then(data => {
+        res.type('image/png');
+        res.send(data); 
+    })
+    .catch(err => {
+        console.error(err);
+        res.status(500).send('Error processing image');
+    });
 });
 
 // Cấu hình Socket.io
@@ -75,7 +86,7 @@ io.on('connection', (socket) => {
     });
 });
 app.get('*', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Khởi động server
