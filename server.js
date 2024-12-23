@@ -24,7 +24,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
     if (!req.file) {
         return res.status(400).send('No file uploaded');
     }
-    
+
     const imageBuffer = req.file.buffer;
     let coordinates = req.body.coords;
 
@@ -38,7 +38,16 @@ app.post('/upload', upload.single('image'), (req, res) => {
 
     // Xử lý ảnh và vẽ border hình chữ nhật
     sharp(imageBuffer)
-        .overlayWith(createRectangle(coordinates), { gravity: sharp.gravity.center }) // Vẽ hình chữ nhật lên ảnh
+        .resize(1000, 1000) // Resize ảnh nếu cần
+        .composite([{
+            input: Buffer.from(`
+                <svg width="1000" height="1000">
+                    <rect x="${coordinates[0]}" y="${coordinates[1]}" width="${coordinates[2] - coordinates[0]}" height="${coordinates[3] - coordinates[1]}" fill="rgba(255, 0, 0, 0.5)" />
+                </svg>
+            `),
+            top: 0,
+            left: 0
+        }]) // Chèn hình chữ nhật lên ảnh
         .toBuffer()
         .then(data => {
             res.type('image/png');
@@ -50,24 +59,10 @@ app.post('/upload', upload.single('image'), (req, res) => {
         });
 });
 
-// Hàm tạo ảnh hình chữ nhật từ tọa độ
-const { createCanvas } = require('canvas'); // Thêm vào đầu file
-
-// Hàm tạo ảnh hình chữ nhật từ tọa độ
-function createRectangle(coords) {
-    const [x1, y1, x2, y2] = coords;
-
-    const canvas = createCanvas(1000, 1000); // Tạo canvas mới
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Màu border đỏ trong suốt
-    ctx.fillRect(x1, y1, x2 - x1, y2 - y1); // Vẽ hình chữ nhật
-    return canvas.toBuffer(); // Trả về buffer của canvas
-}
-
 // Cấu hình Socket.io
 io.on('connection', (socket) => {
     console.log('A user connected');
-    
+
     socket.on('sendImageData', (data) => {
         // Xử lý dữ liệu khi nhận được từ client
         // (Ví dụ: ảnh và tọa độ) và gửi lại ảnh có border
